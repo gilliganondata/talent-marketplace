@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin — Talent Marketplace</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="../assets/supabase-client.js"></script>
+</head>
+<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 3rem auto;">
+  <h1>Admin</h1>
+  <button id="login-btn">Sign in with GitHub</button>
+  <div id="status" style="margin-top: 1rem;"></div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+
+    document.getElementById("login-btn").addEventListener("click", async () => {
+      await supabaseClient.auth.signInWithOAuth({
+        provider: "github",
+        options: { redirectTo: window.location.origin + "/admin/" }
+        });
+    });
+
+    async function showSession() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        statusEl.innerHTML = `
+          <p>Logged in as: ${session.user.email ?? session.user.user_metadata?.user_name ?? "unknown"}</p>
+          <p>Your Supabase user ID (copy this): <code>${session.user.id}</code></p>
+        `;
+      } else {
+        statusEl.textContent = "Not logged in.";
+      }
+    }
+
+    showSession();
+  </script>
+</body>
+</html>

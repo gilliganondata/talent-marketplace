@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Archive — Talent Marketplace</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="../assets/supabase-client.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 1.4rem; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tabs button.active { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      margin-bottom: 1rem;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      background: #fafafa;
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .card-header h3 { margin: 0; font-size: 1.05rem; }
+    .meta { font-size: 0.8rem; color: #888; }
+    .field-row { margin-top: 0.4rem; font-size: 0.92rem; }
+    .field-row strong { color: #444; }
+    .badge {
+      display: inline-block; font-size: 0.75rem; padding: 0.15rem 0.5rem;
+      border-radius: 10px; background: #e6f4ea; color: #1e6b34; margin-left: 0.5rem;
+    }
+    .card-actions { margin-top: 0.6rem; }
+    .card-actions button {
+      font-size: 0.85rem; padding: 0.35rem 0.7rem; border-radius: 6px; border: 1px solid #ccc;
+      background: white; cursor: pointer;
+    }
+    .empty-state { color: #888; font-style: italic; padding: 2rem 0; text-align: center; }
+    a.back-link { font-size: 0.85rem; }
+  </style>
+</head>
+<body x-data="archiveApp()" x-init="init()">
+
+  <div x-show="!session">
+    <h1>Archive</h1>
+    <button @click="login()">Sign in with GitHub</button>
+  </div>
+
+  <div x-show="session && !isAdmin && checkedAdmin">
+    <h1>Not authorized</h1>
+    <p>This GitHub account isn't on the admin allow-list for this instance.</p>
+  </div>
+
+  <div x-show="session && isAdmin">
+    <div class="top-bar">
+      <h1>Archive</h1>
+      <a class="back-link" href="./index.html">← Back to admin</a>
+    </div>
+
+    <div class="tabs">
+      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
+      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
+    </div>
+
+    <input type="text" placeholder="Search archived records..." x-model="searchTerm" />
+
+    <div x-show="tab === 'seekers'">
+      <template x-if="filteredSeekers.length === 0"><p class="empty-state">No archived job seekers match.</p></template>
+      <template x-for="seeker in filteredSeekers" :key="seeker.id">
+        <div class="card">
+          <div class="card-header">
+            <h3>
+              <span x-text="seeker.name"></span>
+              <span class="badge" x-show="seeker.helped_facilitate">Helped facilitate</span>
+            </h3>
+            <span class="meta" x-text="'Closed ' + new Date(seeker.closed_at).toLocaleDateString()"></span>
+          </div>
+          <div class="field-row"><strong>LinkedIn:</strong> <a :href="seeker.linkedin_url" target="_blank" x-text="seeker.linkedin_url"></a></div>
+          <div class="field-row"><strong>Location:</strong> <span x-text="seeker.location"></span></div>
+          <div class="field-row" x-show="seeker.rating"><strong>Rating:</strong> <span x-text="seeker.rating"></span></div>
+          <div class="field-row" x-show="seeker.admin_notes"><strong>Admin notes:</strong> <span x-text="seeker.admin_notes"></span></div>
+          <div class="card-actions">
+            <button @click="unarchive('job_seekers', seeker)">Un-archive</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div x-show="tab === 'hiring'">
+      <template x-if="filteredHiring.length === 0"><p class="empty-state">No archived hiring contacts match.</p></template>
+      <template x-for="contact in filteredHiring" :key="contact.id">
+        <div class="card">
+          <div class="card-header">
+            <h3>
+              <span x-text="contact.name"></span>
+              <span class="badge" x-show="contact.helped_facilitate">Helped facilitate</span>
+            </h3>
+            <span class="meta" x-text="'Closed ' + new Date(contact.closed_at).toLocaleDateString()"></span>
+          </div>
+          <div class="field-row"><strong>Email:</strong> <span x-text="contact.email"></span></div>
+          <div class="field-row"><strong>JD:</strong> <a :href="contact.jd_url" target="_blank" x-text="contact.jd_url"></a></div>
+          <div class="field-row" x-show="contact.admin_notes"><strong>Admin notes:</strong> <span x-text="contact.admin_notes"></span></div>
+          <div class="card-actions">
+            <button @click="unarchive('hiring_contacts', contact)">Un-archive</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function archiveApp() {
+      return {
+        session: null,
+        isAdmin: false,
+        checkedAdmin: false,
+        tab: "seekers",
+        searchTerm: "",
+        seekers: [],
+        hiring: [],
+
+        async init() {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          this.session = session;
+
+          supabaseClient.auth.onAuthStateChange((_event, session) => {
+            this.session = session;
+          });
+
+          if (this.session) {
+            await this.checkAdminAndLoad();
+          }
+        },
+
+        async login() {
+          await supabaseClient.auth.signInWithOAuth({
+            provider: "github",
+            options: { redirectTo: window.location.origin + "/admin/archive.html" }
+          });
+        },
+
+        async checkAdminAndLoad() {
+          const { data, error } = await supabaseClient.rpc("is_admin");
+          this.checkedAdmin = true;
+          this.isAdmin = !error && data === true;
+          if (this.isAdmin) {
+            await this.loadData();
+          }
+        },
+
+        async loadData() {
+          const { data: seekers } = await supabaseClient
+            .from("job_seekers")
+            .select("*")
+            .eq("status", "archived")
+            .order("closed_at", { ascending: false });
+
+          const { data: hiring } = await supabaseClient
+            .from("hiring_contacts")
+            .select("*")
+            .eq("status", "archived")
+            .order("closed_at", { ascending: false });
+
+          this.seekers = seekers || [];
+          this.hiring = hiring || [];
+        },
+
+        get filteredSeekers() {
+          const term = this.searchTerm.trim().toLowerCase();
+          if (!term) return this.seekers;
+          return this.seekers.filter(s =>
+            [s.name, s.location, s.notes, s.admin_notes]
+              .filter(Boolean)
+              .some(field => field.toLowerCase().includes(term))
+          );
+        },
+
+        get filteredHiring() {
+          const term = this.searchTerm.trim().toLowerCase();
+          if (!term) return this.hiring;
+          return this.hiring.filter(h =>
+            [h.name, h.notes, h.admin_notes].filter(Boolean).some(field => field.toLowerCase().includes(term))
+          );
+        },
+
+        async unarchive(table, record) {
+          await supabaseClient
+            .from(table)
+            .update({ status: "active", closed_at: null, helped_facilitate: false })
+            .eq("id", record.id);
+
+          if (table === "job_seekers") {
+            this.seekers = this.seekers.filter(s => s.id !== record.id);
+          } else {
+            this.hiring = this.hiring.filter(h => h.id !== record.id);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

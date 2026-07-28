@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Talent Marketplace</title>
+  <script src="./assets/site-config.js"></script>
+  <script src="./assets/theme.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="./assets/styles.css" />
+</head>
+<body  class="page-medium" x-data="landingApp()">
+
+  <h1 x-text="siteName"></h1>
+  <p class="intro">A small, low-key way for me to keep track of people looking for their next role, and people looking to fill one, so good matches don't just depend on my memory (which, respectfully, has limits).</p>
+
+  <div class="link-cards">
+    <a class="link-card" href="./seeker-form.html">
+      <h2>I'm looking for my next opportunity</h2>
+      <p>Tell me a bit about what you're looking for. Takes under a minute.</p>
+      <span class="go">Get started →</span>
+    </a>
+    <a class="link-card" href="./hiring-form.html">
+      <h2>I'm looking to fill a role</h2>
+      <p>Share the role and I'll check it against people I know.</p>
+      <span class="go">Get started →</span>
+    </a>
+  </div>
+
+  <div class="faq">
+    <h2>Frequently Asked (and pre-emptively answered) Questions</h2>
+    <template x-for="(item, index) in faqs" :key="index">
+      <div class="faq-item">
+        <button class="faq-question" @click="openIndex = (openIndex === index ? null : index)">
+          <span x-text="item.q"></span>
+          <span x-text="openIndex === index ? '−' : '+'"></span>
+        </button>
+        <div class="faq-answer" x-show="openIndex === index" x-text="item.a"></div>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function landingApp() {
+      return {
+        openIndex: null,
+        siteName: (window.SITE_CONFIG && window.SITE_CONFIG.siteName) || "Talent Marketplace",
+        faqs: [
+          {
+            q: "Is this a job board?",
+            a: "No. A job board is a wall of strangers. This is one guy who happens to remember you exist and occasionally follows through on it."
+          },
+          {
+            q: "Will you definitely find me a job / candidate?",
+            a: "Definitely not. I make no promises, just a genuine effort. Think of it less as a guarantee and more as a well-intentioned neighborhood watch for careers."
+          },
+          {
+            q: "What happens to my info?",
+            a: "It sits quietly in a database that only I can see, gets a private rating you'll never see, and eventually gets archived once things resolve. No selling, no spam, no mystery newsletter."
+          },
+          {
+            q: "What's the \"how do we know each other\" question about?",
+            a: "Mostly it helps me remember context later. Also, gently, it's a polite way of asking: do we actually know each other, or did you find this link in a dark corner of the internet?"
+          },
+          {
+            q: "If I submit, will I hear back right away?",
+            a: "Not necessarily, this works in the background. I check in periodically, and I'll reach out directly if something looks like a fit. No news isn't bad news, it's just news that hasn't happened yet."
+          },
+          {
+            q: "Can I update or remove my submission later?",
+            a: "Just reach out to me directly and I'll take care of it. There's no self-serve account to log into, this is intentionally low-tech on your end."
+          }
+        ]
+      };
+    }
+  </script>
+</body>
+</html>

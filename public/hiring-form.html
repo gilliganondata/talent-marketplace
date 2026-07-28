@@ -4,50 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Looking to fill a role?</title>
+  <script src="./assets/site-config.js"></script>
+  <script src="./assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="./assets/supabase-client.js"></script>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 480px;
-      margin: 2rem auto;
-      padding: 0 1.25rem;
-      color: #1a1a1a;
-    }
-    h1 { font-size: 1.4rem; }
-    p.intro { color: #555; line-height: 1.4; }
-    label { display: block; margin-top: 1.1rem; font-weight: 600; font-size: 0.95rem; }
-    .hint { font-weight: 400; color: #777; font-size: 0.85rem; }
-    input[type="text"], input[type="email"], input[type="url"], textarea {
-      width: 100%;
-      padding: 0.6rem;
-      margin-top: 0.35rem;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      box-sizing: border-box;
-    }
-    textarea { min-height: 4rem; resize: vertical; }
-    button {
-      margin-top: 1.5rem;
-      width: 100%;
-      padding: 0.75rem;
-      font-size: 1rem;
-      font-weight: 600;
-      background: #1a1a1a;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:disabled { background: #999; }
-    .error { color: #b00020; font-size: 0.9rem; margin-top: 0.5rem; }
-    .confirmation { text-align: center; padding: 3rem 0; }
-    .privacy-note { font-size: 0.8rem; color: #777; margin-top: 0.35rem; }
-    .hp-field { position: absolute; left: -9999px; top: -9999px; }
-  </style>
+  <link rel="stylesheet" href="./assets/styles.css" />
 </head>
-<body>
+<body class="page-narrow">
 
   <div id="form-view">
     <h1>Looking to fill a role?</h1>

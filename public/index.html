@@ -35,7 +35,14 @@
           <span x-text="item.q"></span>
           <span x-text="openIndex === index ? '−' : '+'"></span>
         </button>
-        <div class="faq-answer" x-show="openIndex === index" x-text="item.a"></div>
+        <div class="faq-answer" x-show="openIndex === index">
+          <span x-text="item.a"></span>
+          <template x-if="item.link">
+            <div style="margin-top: 0.5rem;">
+              <a :href="item.link" target="_blank" x-text="item.linkLabel || item.link"></a>
+            </div>
+          </template>
+        </div>
       </div>
     </template>
   </div>
@@ -69,6 +76,12 @@
           {
             q: "Can I update or remove my submission later?",
             a: "Just reach out to me directly and I'll take care of it. There's no self-serve account to log into, this is intentionally low-tech on your end."
+          },
+          {
+            q: "This is a cool idea. Can I build a version for myself?",
+            a: "Yes, please! The whole thing is open source specifically so other people can run their own version for their own network.",
+            link: (window.SITE_CONFIG && window.SITE_CONFIG.repoUrl) || "#",
+            linkLabel: "View the code and setup guide on GitHub"
           }
         ]
       };

@@ -8,5 +8,6 @@ window.SITE_CONFIG = {
   siteName: "Tim Wilson's Personal Talent Marketplace",
   // Pick one: "slate" (neutral gray/black, the original look),
   // "ocean" (blue), "forest" (green), "sunset" (warm orange/coral), "plum" (purple)
-  theme: "ocean"
+  theme: "ocean",
+  repoUrl: "https://github.com/gilliganondata/talent-marketplace"
 };

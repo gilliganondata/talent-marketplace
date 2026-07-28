@@ -2,38 +2,302 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin — Talent Marketplace</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="../assets/supabase-client.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 1.4rem; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .counts { font-size: 0.9rem; color: #555; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tabs button.active { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      margin-bottom: 1rem;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .card-header h3 { margin: 0; font-size: 1.05rem; }
+    .meta { font-size: 0.8rem; color: #888; }
+    .field-row { margin-top: 0.4rem; font-size: 0.92rem; }
+    .field-row strong { color: #444; }
+    .rating-buttons { margin-top: 0.6rem; }
+    .rating-buttons button {
+      width: 2rem; height: 2rem; margin-right: 0.3rem;
+      border-radius: 5px; border: 1px solid #ccc; background: white; cursor: pointer;
+    }
+    .rating-buttons button.selected { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+    textarea.admin-notes {
+      width: 100%; margin-top: 0.5rem; padding: 0.5rem; font-size: 0.9rem;
+      border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; min-height: 3rem;
+    }
+    .card-actions { margin-top: 0.6rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .card-actions button, .card-actions a {
+      font-size: 0.85rem; padding: 0.35rem 0.7rem; border-radius: 6px; border: 1px solid #ccc;
+      background: white; cursor: pointer; text-decoration: none; color: #1a1a1a;
+    }
+    .close-panel { margin-top: 0.6rem; padding: 0.6rem; background: #f9f9f9; border-radius: 6px; }
+    .empty-state { color: #888; font-style: italic; padding: 2rem 0; text-align: center; }
+  </style>
 </head>
-<body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 3rem auto;">
-  <h1>Admin</h1>
-  <button id="login-btn">Sign in with GitHub</button>
-  <div id="status" style="margin-top: 1rem;"></div>
+<body x-data="adminApp()" x-init="init()">
+
+  <div x-show="!session">
+    <h1>Admin</h1>
+    <button @click="login()">Sign in with GitHub</button>
+  </div>
+
+  <div x-show="session && !isAdmin && checkedAdmin">
+    <h1>Not authorized</h1>
+    <p>This GitHub account isn't on the admin allow-list for this instance.</p>
+  </div>
+
+  <div x-show="session && isAdmin">
+    <div class="top-bar">
+      <h1>Admin</h1>
+      <div class="counts">
+        <span x-text="`${seekersFacilitatedCount} seekers placed you helped facilitate`"></span> ·
+        <span x-text="`${hiringFacilitatedCount} roles filled you helped facilitate`"></span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
+      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
+      <a href="./archive.html" style="margin-left: auto; font-size: 0.85rem; align-self: center;">View archive →</a>
+    </div>
+
+    <input type="text" placeholder="Filter by keyword or location..." x-model="searchTerm" />
+
+    <!-- Job Seekers list -->
+    <div x-show="tab === 'seekers'">
+      <template x-if="filteredSeekers.length === 0"><p class="empty-state">No active job seekers match.</p></template>
+      <template x-for="seeker in filteredSeekers" :key="seeker.id">
+        <div class="card">
+          <div class="card-header">
+            <h3 x-text="seeker.name"></h3>
+            <span class="meta" x-text="new Date(seeker.submitted_at).toLocaleDateString()"></span>
+          </div>
+          <div class="field-row"><strong>LinkedIn:</strong> <a :href="seeker.linkedin_url" target="_blank" x-text="seeker.linkedin_url"></a></div>
+          <div class="field-row"><strong>Location:</strong> <span x-text="seeker.location"></span></div>
+          <div class="field-row" x-show="seeker.work_preference"><strong>Preference:</strong> <span x-text="seeker.work_preference"></span></div>
+          <div class="field-row" x-show="seeker.relationship_note"><strong>How we know each other:</strong> <span x-text="seeker.relationship_note"></span></div>
+          <div class="field-row" x-show="seeker.notes"><strong>Notes:</strong> <span x-text="seeker.notes"></span></div>
+
+          <div class="rating-buttons">
+            <strong style="font-size:0.9rem;">Rating:</strong>
+            <template x-for="n in [1,2,3,4,5]" :key="n">
+              <button :class="{selected: seeker.rating === n}" @click="setRating(seeker, n)" x-text="n"></button>
+            </template>
+          </div>
+
+          <textarea class="admin-notes" placeholder="Private admin notes..."
+                    x-model="seeker.admin_notes"
+                    @blur="saveNotes('job_seekers', seeker)"></textarea>
+
+          <div class="card-actions">
+            <button @click="seeker.showClose = !seeker.showClose">Mark placed / close</button>
+          </div>
+
+          <div class="close-panel" x-show="seeker.showClose">
+            <label>
+              <input type="checkbox" x-model="seeker.helpedFacilitateDraft" />
+              I helped facilitate this
+            </label>
+            <div style="margin-top:0.5rem;">
+              <button @click="archiveRecord('job_seekers', seeker)">Confirm close</button>
+              <button @click="seeker.showClose = false">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Hiring Contacts list -->
+    <div x-show="tab === 'hiring'">
+      <template x-if="filteredHiring.length === 0"><p class="empty-state">No active hiring contacts match.</p></template>
+      <template x-for="contact in filteredHiring" :key="contact.id">
+        <div class="card">
+          <div class="card-header">
+            <h3 x-text="contact.name"></h3>
+            <span class="meta" x-text="new Date(contact.submitted_at).toLocaleDateString()"></span>
+          </div>
+          <div class="field-row"><strong>Email:</strong> <span x-text="contact.email"></span></div>
+          <div class="field-row"><strong>JD:</strong> <a :href="contact.jd_url" target="_blank" x-text="contact.jd_url"></a></div>
+          <div class="field-row" x-show="contact.notes"><strong>Notes:</strong> <span x-text="contact.notes"></span></div>
+
+          <textarea class="admin-notes" placeholder="Private admin notes..."
+                    x-model="contact.admin_notes"
+                    @blur="saveNotes('hiring_contacts', contact)"></textarea>
+
+          <div class="card-actions">
+            <button @click="contact.showClose = !contact.showClose">Mark filled / close</button>
+          </div>
+
+          <div class="close-panel" x-show="contact.showClose">
+            <label>
+              <input type="checkbox" x-model="contact.helpedFacilitateDraft" />
+              I helped facilitate this
+            </label>
+            <div style="margin-top:0.5rem;">
+              <button @click="archiveRecord('hiring_contacts', contact)">Confirm close</button>
+              <button @click="contact.showClose = false">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
 
   <script>
-    const statusEl = document.getElementById("status");
+    function adminApp() {
+      return {
+        session: null,
+        isAdmin: false,
+        checkedAdmin: false,
+        tab: "seekers",
+        searchTerm: "",
+        seekers: [],
+        hiring: [],
+        seekersFacilitatedCount: 0,
+        hiringFacilitatedCount: 0,
 
-    document.getElementById("login-btn").addEventListener("click", async () => {
-      await supabaseClient.auth.signInWithOAuth({
-        provider: "github",
-        options: { redirectTo: window.location.origin + "/admin/" }
-        });
-    });
+        async init() {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          this.session = session;
 
-    async function showSession() {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) {
-        statusEl.innerHTML = `
-          <p>Logged in as: ${session.user.email ?? session.user.user_metadata?.user_name ?? "unknown"}</p>
-          <p>Your Supabase user ID (copy this): <code>${session.user.id}</code></p>
-        `;
-      } else {
-        statusEl.textContent = "Not logged in.";
-      }
+          supabaseClient.auth.onAuthStateChange((_event, session) => {
+            this.session = session;
+          });
+
+          if (this.session) {
+            await this.checkAdminAndLoad();
+          }
+        },
+
+        async login() {
+          await supabaseClient.auth.signInWithOAuth({
+            provider: "github",
+            options: { redirectTo: window.location.origin + "/admin/" }
+          });
+        },
+
+        async checkAdminAndLoad() {
+          const { data, error } = await supabaseClient.rpc("is_admin");
+          this.checkedAdmin = true;
+          this.isAdmin = !error && data === true;
+          if (this.isAdmin) {
+            await this.loadData();
+          }
+        },
+
+        async loadData() {
+          const { data: seekers } = await supabaseClient
+            .from("job_seekers")
+            .select("*")
+            .eq("status", "active")
+            .order("submitted_at", { ascending: false });
+
+          const { data: hiring } = await supabaseClient
+            .from("hiring_contacts")
+            .select("*")
+            .eq("status", "active")
+            .order("submitted_at", { ascending: false });
+
+          this.seekers = (seekers || []).map(s => ({ ...s, showClose: false, helpedFacilitateDraft: false }));
+          this.hiring = (hiring || []).map(h => ({ ...h, showClose: false, helpedFacilitateDraft: false }));
+
+          await this.loadFacilitationCounts();
+        },
+
+        async loadFacilitationCounts() {
+          const { count: seekerCount } = await supabaseClient
+            .from("job_seekers")
+            .select("*", { count: "exact", head: true })
+            .eq("helped_facilitate", true);
+
+          const { count: hiringCount } = await supabaseClient
+            .from("hiring_contacts")
+            .select("*", { count: "exact", head: true })
+            .eq("helped_facilitate", true);
+
+          this.seekersFacilitatedCount = seekerCount || 0;
+          this.hiringFacilitatedCount = hiringCount || 0;
+        },
+
+        get filteredSeekers() {
+          const term = this.searchTerm.trim().toLowerCase();
+          if (!term) return this.seekers;
+          return this.seekers.filter(s =>
+            [s.name, s.location, s.notes, s.relationship_note, s.work_preference]
+              .filter(Boolean)
+              .some(field => field.toLowerCase().includes(term))
+          );
+        },
+
+        get filteredHiring() {
+          const term = this.searchTerm.trim().toLowerCase();
+          if (!term) return this.hiring;
+          return this.hiring.filter(h =>
+            [h.name, h.notes].filter(Boolean).some(field => field.toLowerCase().includes(term))
+          );
+        },
+
+        async setRating(seeker, n) {
+          seeker.rating = n;
+          await supabaseClient.from("job_seekers").update({ rating: n }).eq("id", seeker.id);
+        },
+
+        async saveNotes(table, record) {
+          await supabaseClient.from(table).update({ admin_notes: record.admin_notes }).eq("id", record.id);
+        },
+
+        async archiveRecord(table, record) {
+          await supabaseClient
+            .from(table)
+            .update({
+              status: "archived",
+              closed_at: new Date().toISOString(),
+              helped_facilitate: record.helpedFacilitateDraft
+            })
+            .eq("id", record.id);
+
+          // Remove from the active list view and refresh the counts
+          if (table === "job_seekers") {
+            this.seekers = this.seekers.filter(s => s.id !== record.id);
+          } else {
+            this.hiring = this.hiring.filter(h => h.id !== record.id);
+          }
+          await this.loadFacilitationCounts();
+        }
+      };
     }
-
-    showSession();
   </script>
 </body>
 </html>

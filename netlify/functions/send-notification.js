@@ -117,7 +117,7 @@ async function sendEmail({ subject, html }) {
     },
     body: JSON.stringify({
       from: "Talent Marketplace <onboarding@resend.dev>",
-      to: [process.env.NOTIFY_EMAIL],
+      to: process.env.NOTIFY_EMAIL,
       subject,
       html
     })

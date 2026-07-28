@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Looking to fill a role?</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="./assets/supabase-client.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 1.4rem; }
+    p.intro { color: #555; line-height: 1.4; }
+    label { display: block; margin-top: 1.1rem; font-weight: 600; font-size: 0.95rem; }
+    .hint { font-weight: 400; color: #777; font-size: 0.85rem; }
+    input[type="text"], input[type="email"], input[type="url"], textarea {
+      width: 100%;
+      padding: 0.6rem;
+      margin-top: 0.35rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+    textarea { min-height: 4rem; resize: vertical; }
+    button {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:disabled { background: #999; }
+    .error { color: #b00020; font-size: 0.9rem; margin-top: 0.5rem; }
+    .confirmation { text-align: center; padding: 3rem 0; }
+    .privacy-note { font-size: 0.8rem; color: #777; margin-top: 0.35rem; }
+    .hp-field { position: absolute; left: -9999px; top: -9999px; }
+  </style>
+</head>
+<body>
+
+  <div id="form-view">
+    <h1>Looking to fill a role?</h1>
+    <p class="intro">Less than a minute. I'll check this against people in my network I think highly of.</p>
+
+    <form id="hiring-form">
+      <label for="name">Your name *</label>
+      <input type="text" id="name" required autocomplete="name" />
+
+      <label for="email">Your email *</label>
+      <input type="email" id="email" required autocomplete="email" />
+      <p class="privacy-note">Used only so I can reach you directly — never for automated messages, and never shared.</p>
+
+      <label for="jd_url">Link to the job description *</label>
+      <input type="url" id="jd_url" required placeholder="https://..." />
+
+      <label for="notes">Anything you'd like me to know? <span class="hint">(optional)</span></label>
+      <textarea id="notes" placeholder="Must-haves, timeline, comp range..."></textarea>
+
+      <div class="hp-field" aria-hidden="true">
+        <label for="website">Leave this blank</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+      </div>
+
+      <div id="error" class="error" style="display:none;"></div>
+      <button type="submit" id="submit-btn">Submit</button>
+    </form>
+  </div>
+
+  <div id="confirmation-view" class="confirmation" style="display:none;">
+    <h1>Thanks!</h1>
+    <p>Got it — I'll take a look at who might be a fit.</p>
+  </div>
+
+  <script>
+    const form = document.getElementById("hiring-form");
+    const errorEl = document.getElementById("error");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function isPlausibleUrl(url) {
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol.startsWith("http");
+      } catch {
+        return false;
+      }
+    }
+
+    function isPlausibleEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.style.display = "none";
+
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const jd_url = document.getElementById("jd_url").value.trim();
+      const notes = document.getElementById("notes").value.trim() || null;
+      const honeypot = document.getElementById("website").value;
+
+      if (!name || !email || !jd_url) {
+        errorEl.textContent = "Please fill in your name, email, and the job description link.";
+        errorEl.style.display = "block";
+        return;
+      }
+      if (!isPlausibleEmail(email)) {
+        errorEl.textContent = "That doesn't look like a valid email address.";
+        errorEl.style.display = "block";
+        return;
+      }
+      if (!isPlausibleUrl(jd_url)) {
+        errorEl.textContent = "That doesn't look like a valid URL — please check the job description link.";
+        errorEl.style.display = "block";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Submitting...";
+
+      const { error } = await supabaseClient.rpc("submit_hiring_contact", {
+        p_name: name,
+        p_email: email,
+        p_jd_url: jd_url,
+        p_notes: notes,
+        p_honeypot: honeypot
+      });
+
+      if (error) {
+        errorEl.textContent = "Something went wrong submitting this — please try again in a moment.";
+        errorEl.style.display = "block";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Submit";
+        return;
+      }
+
+      document.getElementById("form-view").style.display = "none";
+      document.getElementById("confirmation-view").style.display = "block";
+    });
+  </script>
+</body>
+</html>

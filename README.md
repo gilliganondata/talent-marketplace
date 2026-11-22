@@ -36,6 +36,8 @@ All free-tier, aside from GitHub and Netlify, which this assumes you already hav
 3. Build settings: leave **Base directory** and **Build command** blank, set **Publish directory** to `public`.
 4. Deploy — you'll get a `*.netlify.app` URL.
 
+`netlify.toml` contains one `[[redirects]]` rule that sends the original instance's old domain to its new one. It only matches that hostname, so it's harmless in a fork, but you should remove or replace it with your own.
+
 ### 3. Environment variables
 
 In Netlify: **Project configuration → Environment variables**, add:
@@ -69,10 +71,12 @@ Edit [`public/assets/site-config.js`](./public/assets/site-config.js):
 window.SITE_CONFIG = {
   ownerName: "Your Name",
   siteName: "Your Name's Personal Talent Marketplace",
-  theme: "ocean", // slate, ocean, forest, sunset, or plum
+  theme: "ocean", // slate, ocean, forest, sunset, plum, midnight, or custom
   repoUrl: "https://github.com/your-username/your-repo"
 };
 ```
+
+The file in this repo ships with a `custom` theme (and `customTheme` / `fontStylesheetUrl` entries) for the original instance. Replace those with your own, or delete them and set `theme` to a preset. See [Theming](#theming).
 
 Commit and push.
 
@@ -86,6 +90,44 @@ Commit and push.
 ### 7. Test it
 
 Submit a test entry on `/seeker-form.html` and `/hiring-form.html`. You should get an email for each, and see them appear in `/admin/`.
+
+## Theming
+
+Set `theme` in `site-config.js` to one of the presets: `slate` (neutral), `ocean`, `forest`, `sunset`, `plum` (all light) or `midnight` (neutral dark).
+
+For your own look, set `theme: "custom"` and add a `customTheme` object. It's merged over the preset named in `customTheme.base` (default `slate`); any token you leave out, or give an invalid value, falls back to that preset.
+
+```javascript
+theme: "custom",
+customTheme: {
+  base: "midnight",
+  primary: "#FFC23C", primaryText: "#14161A",
+  fontBody: "'IBM Plex Sans', sans-serif",
+  colorScheme: "dark"
+},
+fontStylesheetUrl: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500&display=swap"
+```
+
+Tokens:
+
+| Token | Used for |
+|---|---|
+| `bg` | Page background |
+| `surface` | Cards, inputs and other raised areas |
+| `text` | Body text |
+| `mutedText` | Secondary text: hints, captions, dates |
+| `primary` / `primaryText` | Buttons and selected states (and checked checkboxes/radios); text on top of `primary` |
+| `accentBg` | Subtle tinted panels and inactive tabs |
+| `border` | Borders and dividers |
+| `link` | Links only |
+| `focus` | Keyboard focus outline |
+| `danger` | Error messages |
+| `fontBody` / `fontDisplay` | Font stacks for body text and headings |
+| `colorScheme` | `light` or `dark`; sets the CSS `color-scheme` so native form controls match |
+
+**Fonts:** `fontBody` and `fontDisplay` are CSS `font-family` values. To use a web font, set `fontStylesheetUrl` to its `https://` stylesheet URL (e.g. from Google Fonts) and `theme.js` will load it. Without that URL, only fonts already on the visitor's device are used.
+
+**Contrast:** run `node scripts/check-contrast.js` to check every preset and your own theme against WCAG 4.5:1 for text pairs (hex colors only).
 
 ## Security notes
 

@@ -7,6 +7,8 @@
 # old hostname to the new one, keeping path and query string. It only matches
 # that exact hostname, so it's harmless in forks, but you should remove or
 # replace it (see README, Deploy).
+# Note: Netlify serves function paths (/.netlify/functions/*) directly, so this
+# rule does not apply to them on the old hostname; they keep working there.
 [[redirects]]
   from = "https://talent.gilliganondata.com/*"
   to = "https://talent.atrwconsulting.com/:splat"

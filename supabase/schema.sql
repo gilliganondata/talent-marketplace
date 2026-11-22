@@ -14,7 +14,7 @@ create table job_seekers (
   name text not null,
   linkedin_url text not null,
   location text not null,
-  work_preference text check (work_preference in ('remote_only','prefers_remote','open_to_relocation','local_only')),
+  work_preference text,
   relationship_note text,
   notes text,
   submitted_at timestamptz not null default now(),
@@ -22,7 +22,11 @@ create table job_seekers (
   admin_notes text,
   status text not null default 'active' check (status in ('active','archived')),
   helped_facilitate boolean not null default false,
-  closed_at timestamptz
+  closed_at timestamptz,
+  -- Must match the options on public/seeker-form.html
+  constraint job_seekers_work_preference_check check (work_preference in (
+    'remote_only', 'remote_or_local', 'open_to_relocation', 'open_to_anything', 'local_only'
+  ))
 );
 
 create table hiring_contacts (
@@ -40,7 +44,10 @@ create table hiring_contacts (
 
 create table rating_tokens (
   token uuid primary key default gen_random_uuid(),
-  job_seeker_id uuid not null references job_seekers(id) on delete cascade,
+  -- Cascade: deleting a job seeker also deletes their rating links.
+  job_seeker_id uuid not null,
+  constraint rating_tokens_job_seeker_id_fkey
+    foreign key (job_seeker_id) references job_seekers(id) on delete cascade,
   rating_value smallint not null check (rating_value between 1 and 5),
   expires_at timestamptz not null default (now() + interval '7 days'),
   used_at timestamptz
@@ -61,11 +68,15 @@ create policy "admins can read job seekers" on job_seekers
   for select using (is_admin());
 create policy "admins can update job seekers" on job_seekers
   for update using (is_admin());
+create policy "admins can delete job seekers" on job_seekers
+  for delete using (is_admin());
 
 create policy "admins can read hiring contacts" on hiring_contacts
   for select using (is_admin());
 create policy "admins can update hiring contacts" on hiring_contacts
   for update using (is_admin());
+create policy "admins can delete hiring contacts" on hiring_contacts
+  for delete using (is_admin());
 
 create policy "admins can read admins" on admins
   for select using (is_admin());

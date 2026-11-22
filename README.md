@@ -5,7 +5,7 @@ A small, private tool for keeping track of two lists that are easy to lose track
 - **People in your network looking for their next role** (job seekers)
 - **People asking you to help fill an open role** (hiring contacts)
 
-Each side gets a public, no-login, under-a-minute intake form. You get a private, authenticated admin view where you can review both lists, privately rate job seekers, filter by keyword/location, add private notes, and archive people once things resolve — plus an email notification (with a one-click rating shortcut) every time someone submits.
+Each side gets a public, no-login, under-a-minute intake form. You get a private, authenticated admin view where you can review both lists in a sortable, filterable table, privately rate job seekers, add private notes, archive people once things resolve, and delete records for good — plus an email notification (with a one-click rating shortcut) every time someone submits.
 
 Nobody who fills out either form can see anyone else's submission, your ratings, or your notes. That's enforced at the database level, not just hidden in the UI — see the Security section below.
 
@@ -25,7 +25,7 @@ All free-tier, aside from GitHub and Netlify, which this assumes you already hav
 ### 1. Supabase project
 
 1. Create a new Supabase project. Pick any region close to you.
-2. In the SQL Editor, run everything in [`supabase/schema.sql`](./supabase/schema.sql). This creates all four tables, enables row-level security, and creates the two public submission functions.
+2. In the SQL Editor, run everything in [`supabase/schema.sql`](./supabase/schema.sql). This creates all four tables, enables row-level security, and creates the two public submission functions. For a new install this is all you run; the files in [`supabase/migrations/`](./supabase/migrations) are only for upgrading an instance you set up earlier (see [Upgrading an existing instance](#upgrading-an-existing-instance)).
 3. Go to **Authentication → Providers → GitHub** and enable it. This requires creating a GitHub OAuth App (**GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**) using the callback URL Supabase shows you on that page. Leave "Enable Device Flow" unchecked. Copy the resulting Client ID/Secret back into Supabase.
 4. From the **Connect** dialog, grab your **Project URL**, **Publishable key**, and **Secret key** — you'll need these shortly.
 
@@ -63,6 +63,14 @@ Create two webhooks, both **Insert**-only, **HTTP Request**, method **POST**:
 
 Both need an HTTP header: `x-webhook-secret` set to the same value as your `WEBHOOK_SECRET` env var.
 
+Keep them **Insert**-only: edits, archiving and deletes should never send email. `send-notification` also ignores any event that isn't an INSERT, as a second safeguard. To check what's configured, run this in the SQL Editor; every row it returns should say `INSERT`:
+
+```sql
+select trigger_name, event_object_table, event_manipulation
+from information_schema.triggers
+where action_statement ilike '%http_request%';
+```
+
 ### 5. Configure the site
 
 Edit [`public/assets/site-config.js`](./public/assets/site-config.js):
@@ -90,6 +98,24 @@ Commit and push.
 ### 7. Test it
 
 Submit a test entry on `/seeker-form.html` and `/hiring-form.html`. You should get an email for each, and see them appear in `/admin/`.
+
+## Admin view
+
+`/admin/` lists active records and `/admin/archive.html` lists archived ones. Both work the same way.
+
+- **Table.** Job Seekers and Hiring Contacts each have their own tab and table. Click a column header to sort ascending, click again for descending; the default is Submitted, newest first. Rows without a value (for example an unrated seeker) always sort last.
+- **Search and filters.** The text box searches names, locations and notes. On the Job Seekers tab, **Work preference** and **Rating** (1–5 or Unrated) are multi-select filters: nothing selected means "all", several selections within one filter match any of them, and different filters combine. Active filters show as chips you can click to clear, and **Clear filters** resets everything. "Showing N of M" counts the rows on the current tab.
+- **Record overlay.** Click a row (or focus it and press Enter) to open the full record. From there you can rate the seeker 1–5, edit your private notes, close/archive the record (with the "I helped facilitate this" flag) or, in the archive, un-archive it. Notes save when you leave the field, and any changed notes are saved before the overlay closes (Esc, Close or a click outside); if that save fails the overlay stays open with an error. Esc closes the overlay and returns focus to the row.
+- **Delete permanently.** Deleting is permanent and can't be undone. It removes the record, and for a job seeker it also removes their one-click rating links (opening one afterwards shows that the link isn't valid or the record no longer exists). It asks for confirmation inside the overlay, works only for admins (enforced by a database policy, not just the UI), and never sends a notification email.
+
+## Upgrading an existing instance
+
+[`supabase/schema.sql`](./supabase/schema.sql) always describes the full current schema, for new installs. If you set up your instance earlier, run the files in [`supabase/migrations/`](./supabase/migrations) in the SQL Editor, in filename order, skipping any you've already run. Each one is safe to re-run.
+
+- `20261122000000_work_preference_check.sql`: lets the database accept every work-preference option on the seeker form. Needed only if your constraint is from an older `schema.sql`.
+- `20261122000100_admin_delete.sql`: adds the admin-only delete policies the admin view's **Delete permanently** needs, and makes sure deleting a seeker also deletes their rating links.
+
+To check that delete is admin-only on your own instance, paste [`supabase/tests/admin_delete_rls.sql`](./supabase/tests/admin_delete_rls.sql) into the SQL Editor and run it. It tries select, update and delete as an anonymous visitor, a signed-in non-admin and an admin, reports PASS/FAIL for each, and rolls everything back.
 
 ## Theming
 

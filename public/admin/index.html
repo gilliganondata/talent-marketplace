@@ -8,10 +8,11 @@
   <script src="../assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="../assets/supabase-client.js"></script>
+  <script src="../assets/admin-table.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="../assets/styles.css" />
 </head>
-<body class="page-wide" x-data="adminApp()" x-init="init()">
+<body class="page-wide" x-data="adminApp('active')" x-init="init()" @keydown.escape.window="onEscape()">
 
   <div x-show="!session">
     <h1>Admin</h1>
@@ -23,7 +24,7 @@
     <p>This GitHub account isn't on the admin allow-list for this instance.</p>
   </div>
 
-  <div x-show="session && isAdmin">
+  <div id="admin-main" x-show="session && isAdmin" x-cloak>
     <div class="top-bar">
       <h1>Admin</h1>
       <div class="counts">
@@ -33,216 +34,155 @@
     </div>
 
     <div class="tabs">
-      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
-      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
-      <a href="./archive.html" style="margin-left: auto; font-size: 0.85rem; align-self: center;">View archive →</a>
+      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'; openFilter = null">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
+      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'; openFilter = null">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
+      <a href="./archive.html" class="tabs-link">View archive →</a>
     </div>
 
+    <!-- Search, filters, chips, row count -->
     <input type="text" placeholder="Filter by keyword or location..." x-model="searchTerm" />
 
-    <!-- Job Seekers list -->
-    <div x-show="tab === 'seekers'">
-      <template x-if="filteredSeekers.length === 0"><p class="empty-state">No active job seekers match.</p></template>
-      <template x-for="seeker in filteredSeekers" :key="seeker.id">
-        <div class="card">
-          <div class="card-header">
-            <h3 x-text="seeker.name"></h3>
-            <span class="meta" x-text="new Date(seeker.submitted_at).toLocaleDateString()"></span>
-          </div>
-          <div class="field-row"><strong>LinkedIn:</strong> <a :href="seeker.linkedin_url" target="_blank" x-text="seeker.linkedin_url"></a></div>
-          <div class="field-row"><strong>Location:</strong> <span x-text="seeker.location"></span></div>
-          <div class="field-row" x-show="seeker.work_preference"><strong>Preference:</strong> <span x-text="seeker.work_preference"></span></div>
-          <div class="field-row" x-show="seeker.relationship_note"><strong>How we know each other:</strong> <span x-text="seeker.relationship_note"></span></div>
-          <div class="field-row" x-show="seeker.notes"><strong>Notes:</strong> <span x-text="seeker.notes"></span></div>
-
-          <div class="rating-buttons">
-            <strong style="font-size:0.9rem;">Rating:</strong>
-            <template x-for="n in [1,2,3,4,5]" :key="n">
-              <button :class="{selected: seeker.rating === n}" @click="setRating(seeker, n)" x-text="n"></button>
-            </template>
-          </div>
-
-          <textarea class="admin-notes" placeholder="Private admin notes..."
-                    x-model="seeker.admin_notes"
-                    @blur="saveNotes('job_seekers', seeker)"></textarea>
-
-          <div class="card-actions">
-            <button @click="seeker.showClose = !seeker.showClose">Mark placed / close</button>
-          </div>
-
-          <div class="close-panel" x-show="seeker.showClose">
-            <label>
-              <input type="checkbox" x-model="seeker.helpedFacilitateDraft" />
-              I helped facilitate this
-            </label>
-            <div style="margin-top:0.5rem;">
-              <button @click="archiveRecord('job_seekers', seeker)">Confirm close</button>
-              <button @click="seeker.showClose = false">Cancel</button>
+    <div class="filter-bar">
+      <template x-if="tab === 'seekers'">
+        <div class="filters">
+          <template x-for="def in filterDefs" :key="def.group">
+            <div class="filter" @click.outside="if (openFilter === def.group) openFilter = null">
+              <button type="button" class="filter-btn" aria-haspopup="true"
+                      :aria-expanded="openFilter === def.group"
+                      @click="openFilter = (openFilter === def.group ? null : def.group)">
+                <span x-text="def.label"></span><span x-show="filters[def.group].length" x-text="` (${filters[def.group].length})`"></span> ▾
+              </button>
+              <div class="filter-panel" x-show="openFilter === def.group" x-cloak>
+                <template x-for="opt in def.options" :key="opt.value">
+                  <label class="filter-option">
+                    <input type="checkbox" :checked="filters[def.group].includes(opt.value)" @change="toggleFilter(def.group, opt.value)" />
+                    <span x-text="opt.label"></span>
+                  </label>
+                </template>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
       </template>
+      <span class="row-count" aria-live="polite" x-text="`Showing ${rows.length} of ${totalCount}`"></span>
     </div>
 
-    <!-- Hiring Contacts list -->
-    <div x-show="tab === 'hiring'">
-      <template x-if="filteredHiring.length === 0"><p class="empty-state">No active hiring contacts match.</p></template>
-      <template x-for="contact in filteredHiring" :key="contact.id">
-        <div class="card">
-          <div class="card-header">
-            <h3 x-text="contact.name"></h3>
-            <span class="meta" x-text="new Date(contact.submitted_at).toLocaleDateString()"></span>
-          </div>
-          <div class="field-row"><strong>Email:</strong> <span x-text="contact.email"></span></div>
-          <div class="field-row"><strong>JD:</strong> <a :href="contact.jd_url" target="_blank" x-text="contact.jd_url"></a></div>
-          <div class="field-row" x-show="contact.notes"><strong>Notes:</strong> <span x-text="contact.notes"></span></div>
-
-          <textarea class="admin-notes" placeholder="Private admin notes..."
-                    x-model="contact.admin_notes"
-                    @blur="saveNotes('hiring_contacts', contact)"></textarea>
-
-          <div class="card-actions">
-            <button @click="contact.showClose = !contact.showClose">Mark filled / close</button>
-          </div>
-
-          <div class="close-panel" x-show="contact.showClose">
-            <label>
-              <input type="checkbox" x-model="contact.helpedFacilitateDraft" />
-              I helped facilitate this
-            </label>
-            <div style="margin-top:0.5rem;">
-              <button @click="archiveRecord('hiring_contacts', contact)">Confirm close</button>
-              <button @click="contact.showClose = false">Cancel</button>
-            </div>
-          </div>
-        </div>
+    <div class="chips" x-show="chips.length" x-cloak>
+      <template x-for="chip in chips" :key="chip.key">
+        <button type="button" class="chip" @click="removeChip(chip)"><span x-text="chip.text"></span> <span aria-hidden="true">×</span></button>
       </template>
+      <button type="button" class="link-button" @click="clearFilters()">Clear filters</button>
+    </div>
+
+    <!-- Table: one row per record; the whole row opens the overlay -->
+    <div class="table-wrap" id="list-anchor" tabindex="-1">
+      <template x-if="rows.length === 0"><p class="empty-state" x-text="emptyText"></p></template>
+      <table class="data-table" x-show="rows.length">
+        <thead>
+          <tr>
+            <template x-for="col in columns" :key="col.key">
+              <th scope="col" :aria-sort="ariaSort(col)">
+                <button type="button" class="sort-btn" @click="setSort(col)">
+                  <span x-text="col.label"></span><span class="sort-arrow" aria-hidden="true" x-text="sortArrow(col)"></span>
+                </button>
+              </th>
+            </template>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in rows" :key="row.id">
+            <tr tabindex="0"
+                @click="openRecord(tab, row, $el)"
+                @keydown.enter.self="openRecord(tab, row, $el)"
+                @keydown.space.self.prevent="openRecord(tab, row, $el)">
+              <template x-for="col in columns" :key="col.key">
+                <td>
+                  <template x-if="col.type === 'link'">
+                    <a :href="safeUrl(row[col.key])" target="_blank" rel="noopener" @click.stop x-text="linkHost(row[col.key])"></a>
+                  </template>
+                  <template x-if="col.type !== 'link'">
+                    <span x-text="cellText(col, row)"></span>
+                  </template>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <script>
-    function adminApp() {
-      return {
-        session: null,
-        isAdmin: false,
-        checkedAdmin: false,
-        tab: "seekers",
-        searchTerm: "",
-        seekers: [],
-        hiring: [],
-        seekersFacilitatedCount: 0,
-        hiringFacilitatedCount: 0,
+  <!-- Overlay card: full record + every action -->
+  <template x-if="selected">
+    <div class="overlay-backdrop" @mousedown="backdropMouse($event, $el)" @click="backdropClick($event, $el)">
+      <div id="record-dialog" class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="record-title"
+           tabindex="-1" @keydown.tab="trapTab($event)">
+        <div class="overlay-header">
+          <h2 id="record-title" x-text="selected.record.name"></h2>
+          <button type="button" class="overlay-close" @click="requestClose()" :aria-disabled="busy">Close</button>
+        </div>
 
-        async init() {
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          this.session = session;
+        <dl class="detail-list">
+          <template x-for="f in detailFields" :key="f.key">
+            <div class="detail-row">
+              <dt x-text="f.label"></dt>
+              <dd>
+                <template x-if="f.type === 'url' && selected.record[f.key]">
+                  <a :href="safeUrl(selected.record[f.key])" target="_blank" rel="noopener" x-text="selected.record[f.key]"></a>
+                </template>
+                <template x-if="!(f.type === 'url' && selected.record[f.key])">
+                  <span x-text="cellText(f, selected.record)"></span>
+                </template>
+              </dd>
+            </div>
+          </template>
+        </dl>
 
-          supabaseClient.auth.onAuthStateChange((_event, session) => {
-            this.session = session;
-          });
+        <div class="rating-buttons" x-show="selected.kind === 'seekers'">
+          <strong style="font-size:0.9rem;">Rating:</strong>
+          <template x-for="n in [1,2,3,4,5]" :key="n">
+            <button type="button" :class="{selected: selected.record.rating === n}" :aria-pressed="selected.record.rating === n"
+                    @click="setRating(n)" x-text="n"></button>
+          </template>
+        </div>
 
-          if (this.session) {
-            await this.checkAdminAndLoad();
-          }
-        },
+        <textarea class="admin-notes" placeholder="Private admin notes..." aria-label="Private admin notes"
+                  x-model="draftNotes" @blur="saveNotes()"></textarea>
 
-        async login() {
-          await supabaseClient.auth.signInWithOAuth({
-            provider: "github",
-            options: { redirectTo: window.location.origin + "/admin/" }
-          });
-        },
+        <p class="error" role="alert" x-show="error" x-text="error"></p>
 
-        async checkAdminAndLoad() {
-          const { data, error } = await supabaseClient.rpc("is_admin");
-          this.checkedAdmin = true;
-          this.isAdmin = !error && data === true;
-          if (this.isAdmin) {
-            await this.loadData();
-          }
-        },
+        <div class="overlay-actions">
+          <button type="button" @click="showClose = !showClose"
+                  x-text="selected.kind === 'seekers' ? 'Mark placed / close' : 'Mark filled / close'"></button>
+        </div>
 
-        async loadData() {
-          const { data: seekers } = await supabaseClient
-            .from("job_seekers")
-            .select("*")
-            .eq("status", "active")
-            .order("submitted_at", { ascending: false });
+        <div class="close-panel" x-show="showClose">
+          <label>
+            <input type="checkbox" x-model="helpedDraft" />
+            I helped facilitate this
+          </label>
+          <div style="margin-top:0.5rem;">
+            <button type="button" @click="archiveRecord()" :aria-disabled="busy">Confirm close</button>
+            <button type="button" @click="showClose = false">Cancel</button>
+          </div>
+        </div>
 
-          const { data: hiring } = await supabaseClient
-            .from("hiring_contacts")
-            .select("*")
-            .eq("status", "active")
-            .order("submitted_at", { ascending: false });
+        <div class="danger-zone">
+          <template x-if="deleteStep === 0">
+            <button type="button" class="btn-danger-outline" @click="startDelete()">Delete permanently</button>
+          </template>
+          <template x-if="deleteStep === 1">
+            <div>
+              <p class="delete-confirm">Permanently delete <strong x-text="selected.record.name"></strong>? This can't be undone.</p>
+              <button type="button" id="delete-cancel" @click="cancelDelete()" :aria-disabled="busy">Cancel</button>
+              <button type="button" class="btn-danger" @click="deleteRecord()" :aria-disabled="busy">Delete</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </template>
 
-          this.seekers = (seekers || []).map(s => ({ ...s, showClose: false, helpedFacilitateDraft: false }));
-          this.hiring = (hiring || []).map(h => ({ ...h, showClose: false, helpedFacilitateDraft: false }));
-
-          await this.loadFacilitationCounts();
-        },
-
-        async loadFacilitationCounts() {
-          const { count: seekerCount } = await supabaseClient
-            .from("job_seekers")
-            .select("*", { count: "exact", head: true })
-            .eq("helped_facilitate", true);
-
-          const { count: hiringCount } = await supabaseClient
-            .from("hiring_contacts")
-            .select("*", { count: "exact", head: true })
-            .eq("helped_facilitate", true);
-
-          this.seekersFacilitatedCount = seekerCount || 0;
-          this.hiringFacilitatedCount = hiringCount || 0;
-        },
-
-        get filteredSeekers() {
-          const term = this.searchTerm.trim().toLowerCase();
-          if (!term) return this.seekers;
-          return this.seekers.filter(s =>
-            [s.name, s.location, s.notes, s.relationship_note, s.work_preference]
-              .filter(Boolean)
-              .some(field => field.toLowerCase().includes(term))
-          );
-        },
-
-        get filteredHiring() {
-          const term = this.searchTerm.trim().toLowerCase();
-          if (!term) return this.hiring;
-          return this.hiring.filter(h =>
-            [h.name, h.notes].filter(Boolean).some(field => field.toLowerCase().includes(term))
-          );
-        },
-
-        async setRating(seeker, n) {
-          seeker.rating = n;
-          await supabaseClient.from("job_seekers").update({ rating: n }).eq("id", seeker.id);
-        },
-
-        async saveNotes(table, record) {
-          await supabaseClient.from(table).update({ admin_notes: record.admin_notes }).eq("id", record.id);
-        },
-
-        async archiveRecord(table, record) {
-          await supabaseClient
-            .from(table)
-            .update({
-              status: "archived",
-              closed_at: new Date().toISOString(),
-              helped_facilitate: record.helpedFacilitateDraft
-            })
-            .eq("id", record.id);
-
-          // Remove from the active list view and refresh the counts
-          if (table === "job_seekers") {
-            this.seekers = this.seekers.filter(s => s.id !== record.id);
-          } else {
-            this.hiring = this.hiring.filter(h => h.id !== record.id);
-          }
-          await this.loadFacilitationCounts();
-        }
-      };
-    }
-  </script>
+  <div class="toast" role="status" aria-live="polite" x-show="toast" x-text="toast" x-cloak></div>
 </body>
 </html>

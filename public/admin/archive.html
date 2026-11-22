@@ -8,10 +8,11 @@
   <script src="../assets/theme.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="../assets/supabase-client.js"></script>
+  <script src="../assets/admin-table.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="stylesheet" href="../assets/styles.css" />
 </head>
-<body class="page-wide" x-data="archiveApp()" x-init="init()">
+<body class="page-wide" x-data="adminApp('archived')" x-init="init()" @keydown.escape.window="onEscape()">
 
   <div x-show="!session">
     <h1>Archive</h1>
@@ -23,152 +24,149 @@
     <p>This GitHub account isn't on the admin allow-list for this instance.</p>
   </div>
 
-  <div x-show="session && isAdmin">
+  <div id="admin-main" x-show="session && isAdmin" x-cloak>
     <div class="top-bar">
       <h1>Archive</h1>
       <a class="back-link" href="./index.html">← Back to admin</a>
     </div>
 
     <div class="tabs">
-      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
-      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
+      <button :class="{active: tab === 'seekers'}" @click="tab = 'seekers'; openFilter = null">Job Seekers (<span x-text="filteredSeekers.length"></span>)</button>
+      <button :class="{active: tab === 'hiring'}" @click="tab = 'hiring'; openFilter = null">Hiring Contacts (<span x-text="filteredHiring.length"></span>)</button>
     </div>
 
+    <!-- Search, filters, chips, row count -->
     <input type="text" placeholder="Search archived records..." x-model="searchTerm" />
 
-    <div x-show="tab === 'seekers'">
-      <template x-if="filteredSeekers.length === 0"><p class="empty-state">No archived job seekers match.</p></template>
-      <template x-for="seeker in filteredSeekers" :key="seeker.id">
-        <div class="card archived">
-          <div class="card-header">
-            <h3>
-              <span x-text="seeker.name"></span>
-              <span class="badge" x-show="seeker.helped_facilitate">Helped facilitate</span>
-            </h3>
-            <span class="meta" x-text="'Closed ' + new Date(seeker.closed_at).toLocaleDateString()"></span>
-          </div>
-          <div class="field-row"><strong>LinkedIn:</strong> <a :href="seeker.linkedin_url" target="_blank" x-text="seeker.linkedin_url"></a></div>
-          <div class="field-row"><strong>Location:</strong> <span x-text="seeker.location"></span></div>
-          <div class="field-row" x-show="seeker.rating"><strong>Rating:</strong> <span x-text="seeker.rating"></span></div>
-          <div class="field-row" x-show="seeker.admin_notes"><strong>Admin notes:</strong> <span x-text="seeker.admin_notes"></span></div>
-          <div class="card-actions">
-            <button @click="unarchive('job_seekers', seeker)">Un-archive</button>
-          </div>
+    <div class="filter-bar">
+      <template x-if="tab === 'seekers'">
+        <div class="filters">
+          <template x-for="def in filterDefs" :key="def.group">
+            <div class="filter" @click.outside="if (openFilter === def.group) openFilter = null">
+              <button type="button" class="filter-btn" aria-haspopup="true"
+                      :aria-expanded="openFilter === def.group"
+                      @click="openFilter = (openFilter === def.group ? null : def.group)">
+                <span x-text="def.label"></span><span x-show="filters[def.group].length" x-text="` (${filters[def.group].length})`"></span> ▾
+              </button>
+              <div class="filter-panel" x-show="openFilter === def.group" x-cloak>
+                <template x-for="opt in def.options" :key="opt.value">
+                  <label class="filter-option">
+                    <input type="checkbox" :checked="filters[def.group].includes(opt.value)" @change="toggleFilter(def.group, opt.value)" />
+                    <span x-text="opt.label"></span>
+                  </label>
+                </template>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
+      <span class="row-count" aria-live="polite" x-text="`Showing ${rows.length} of ${totalCount}`"></span>
     </div>
 
-    <div x-show="tab === 'hiring'">
-      <template x-if="filteredHiring.length === 0"><p class="empty-state">No archived hiring contacts match.</p></template>
-      <template x-for="contact in filteredHiring" :key="contact.id">
-        <div class="card archived">
-          <div class="card-header">
-            <h3>
-              <span x-text="contact.name"></span>
-              <span class="badge" x-show="contact.helped_facilitate">Helped facilitate</span>
-            </h3>
-            <span class="meta" x-text="'Closed ' + new Date(contact.closed_at).toLocaleDateString()"></span>
-          </div>
-          <div class="field-row"><strong>Email:</strong> <span x-text="contact.email"></span></div>
-          <div class="field-row"><strong>JD:</strong> <a :href="contact.jd_url" target="_blank" x-text="contact.jd_url"></a></div>
-          <div class="field-row" x-show="contact.admin_notes"><strong>Admin notes:</strong> <span x-text="contact.admin_notes"></span></div>
-          <div class="card-actions">
-            <button @click="unarchive('hiring_contacts', contact)">Un-archive</button>
-          </div>
-        </div>
+    <div class="chips" x-show="chips.length" x-cloak>
+      <template x-for="chip in chips" :key="chip.key">
+        <button type="button" class="chip" @click="removeChip(chip)"><span x-text="chip.text"></span> <span aria-hidden="true">×</span></button>
       </template>
+      <button type="button" class="link-button" @click="clearFilters()">Clear filters</button>
+    </div>
+
+    <!-- Table: one row per record; the whole row opens the overlay -->
+    <div class="table-wrap" id="list-anchor" tabindex="-1">
+      <template x-if="rows.length === 0"><p class="empty-state" x-text="emptyText"></p></template>
+      <table class="data-table" x-show="rows.length">
+        <thead>
+          <tr>
+            <template x-for="col in columns" :key="col.key">
+              <th scope="col" :aria-sort="ariaSort(col)">
+                <button type="button" class="sort-btn" @click="setSort(col)">
+                  <span x-text="col.label"></span><span class="sort-arrow" aria-hidden="true" x-text="sortArrow(col)"></span>
+                </button>
+              </th>
+            </template>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="row in rows" :key="row.id">
+            <tr tabindex="0"
+                @click="openRecord(tab, row, $el)"
+                @keydown.enter.self="openRecord(tab, row, $el)"
+                @keydown.space.self.prevent="openRecord(tab, row, $el)">
+              <template x-for="col in columns" :key="col.key">
+                <td>
+                  <template x-if="col.type === 'link'">
+                    <a :href="safeUrl(row[col.key])" target="_blank" rel="noopener" @click.stop x-text="linkHost(row[col.key])"></a>
+                  </template>
+                  <template x-if="col.type !== 'link'">
+                    <span x-text="cellText(col, row)"></span>
+                  </template>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <script>
-    function archiveApp() {
-      return {
-        session: null,
-        isAdmin: false,
-        checkedAdmin: false,
-        tab: "seekers",
-        searchTerm: "",
-        seekers: [],
-        hiring: [],
+  <!-- Overlay card: full record + every action -->
+  <template x-if="selected">
+    <div class="overlay-backdrop" @mousedown="backdropMouse($event, $el)" @click="backdropClick($event, $el)">
+      <div id="record-dialog" class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="record-title"
+           tabindex="-1" @keydown.tab="trapTab($event)">
+        <div class="overlay-header">
+          <h2 id="record-title" x-text="selected.record.name"></h2>
+          <button type="button" class="overlay-close" @click="requestClose()" :aria-disabled="busy">Close</button>
+        </div>
 
-        async init() {
-          const { data: { session } } = await supabaseClient.auth.getSession();
-          this.session = session;
+        <dl class="detail-list">
+          <template x-for="f in detailFields" :key="f.key">
+            <div class="detail-row">
+              <dt x-text="f.label"></dt>
+              <dd>
+                <template x-if="f.type === 'url' && selected.record[f.key]">
+                  <a :href="safeUrl(selected.record[f.key])" target="_blank" rel="noopener" x-text="selected.record[f.key]"></a>
+                </template>
+                <template x-if="!(f.type === 'url' && selected.record[f.key])">
+                  <span x-text="cellText(f, selected.record)"></span>
+                </template>
+              </dd>
+            </div>
+          </template>
+        </dl>
 
-          supabaseClient.auth.onAuthStateChange((_event, session) => {
-            this.session = session;
-          });
+        <div class="rating-buttons" x-show="selected.kind === 'seekers'">
+          <strong style="font-size:0.9rem;">Rating:</strong>
+          <template x-for="n in [1,2,3,4,5]" :key="n">
+            <button type="button" :class="{selected: selected.record.rating === n}" :aria-pressed="selected.record.rating === n"
+                    @click="setRating(n)" x-text="n"></button>
+          </template>
+        </div>
 
-          if (this.session) {
-            await this.checkAdminAndLoad();
-          }
-        },
+        <textarea class="admin-notes" placeholder="Private admin notes..." aria-label="Private admin notes"
+                  x-model="draftNotes" @blur="saveNotes()"></textarea>
 
-        async login() {
-          await supabaseClient.auth.signInWithOAuth({
-            provider: "github",
-            options: { redirectTo: window.location.origin + "/admin/archive.html" }
-          });
-        },
+        <p class="error" role="alert" x-show="error" x-text="error"></p>
 
-        async checkAdminAndLoad() {
-          const { data, error } = await supabaseClient.rpc("is_admin");
-          this.checkedAdmin = true;
-          this.isAdmin = !error && data === true;
-          if (this.isAdmin) {
-            await this.loadData();
-          }
-        },
+        <div class="overlay-actions">
+          <button type="button" @click="unarchive()" :aria-disabled="busy">Un-archive</button>
+        </div>
 
-        async loadData() {
-          const { data: seekers } = await supabaseClient
-            .from("job_seekers")
-            .select("*")
-            .eq("status", "archived")
-            .order("closed_at", { ascending: false });
+        <div class="danger-zone">
+          <template x-if="deleteStep === 0">
+            <button type="button" class="btn-danger-outline" @click="startDelete()">Delete permanently</button>
+          </template>
+          <template x-if="deleteStep === 1">
+            <div>
+              <p class="delete-confirm">Permanently delete <strong x-text="selected.record.name"></strong>? This can't be undone.</p>
+              <button type="button" id="delete-cancel" @click="cancelDelete()" :aria-disabled="busy">Cancel</button>
+              <button type="button" class="btn-danger" @click="deleteRecord()" :aria-disabled="busy">Delete</button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </template>
 
-          const { data: hiring } = await supabaseClient
-            .from("hiring_contacts")
-            .select("*")
-            .eq("status", "archived")
-            .order("closed_at", { ascending: false });
-
-          this.seekers = seekers || [];
-          this.hiring = hiring || [];
-        },
-
-        get filteredSeekers() {
-          const term = this.searchTerm.trim().toLowerCase();
-          if (!term) return this.seekers;
-          return this.seekers.filter(s =>
-            [s.name, s.location, s.notes, s.admin_notes]
-              .filter(Boolean)
-              .some(field => field.toLowerCase().includes(term))
-          );
-        },
-
-        get filteredHiring() {
-          const term = this.searchTerm.trim().toLowerCase();
-          if (!term) return this.hiring;
-          return this.hiring.filter(h =>
-            [h.name, h.notes, h.admin_notes].filter(Boolean).some(field => field.toLowerCase().includes(term))
-          );
-        },
-
-        async unarchive(table, record) {
-          await supabaseClient
-            .from(table)
-            .update({ status: "active", closed_at: null, helped_facilitate: false })
-            .eq("id", record.id);
-
-          if (table === "job_seekers") {
-            this.seekers = this.seekers.filter(s => s.id !== record.id);
-          } else {
-            this.hiring = this.hiring.filter(h => h.id !== record.id);
-          }
-        }
-      };
-    }
-  </script>
+  <div class="toast" role="status" aria-live="polite" x-show="toast" x-text="toast" x-cloak></div>
 </body>
 </html>

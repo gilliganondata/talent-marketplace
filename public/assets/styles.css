@@ -197,10 +197,12 @@ body.modal-open { overflow: hidden; }
 .overlay-card .btn-danger { background: var(--color-danger); border-color: var(--color-danger); color: var(--color-bg); font-weight: 600; }
 @media (max-width: 520px) { .detail-row { grid-template-columns: 1fr; gap: 0; } }
 
+/* Brief confirmation. Filled with the primary pair so it stands out from the
+   page in every theme (primaryText/primary is contrast-checked). */
 .toast {
-  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 30;
-  padding: 0.6rem 1rem; border-radius: 8px; font-size: 0.9rem;
-  background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border);
+  position: fixed; top: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 30;
+  padding: 0.7rem 1.2rem; border-radius: 8px; font-size: 1rem; font-weight: 600;
+  background: var(--color-primary); color: var(--color-primary-text);
 }
 
 .rating-buttons { margin-top: 0.6rem; }

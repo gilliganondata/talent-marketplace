@@ -398,7 +398,7 @@ function adminApp(mode) {
     showToast(text) {
       this.toast = text;
       clearTimeout(this.toastTimer);
-      this.toastTimer = setTimeout(() => { this.toast = ""; }, 4000);
+      this.toastTimer = setTimeout(() => { this.toast = ""; }, 5000);
     },
 
     // ── Overlay: actions ─────────────────────────────────────────────

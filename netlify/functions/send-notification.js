@@ -20,7 +20,14 @@ exports.handler = async (event) => {
   }
 
   const payload = JSON.parse(event.body);
-  const { table, record } = payload;
+  const { type, table, record } = payload;
+
+  // Only new submissions send email. Supabase webhooks should be INSERT-only
+  // (see README), but ignore UPDATE/DELETE events defensively so that edits,
+  // archiving and permanent deletes can never trigger a notification.
+  if (type !== "INSERT" || !record) {
+    return { statusCode: 200, body: "ignored" };
+  }
 
   if (table === "job_seekers") {
     await handleJobSeeker(record);

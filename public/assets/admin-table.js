@@ -8,8 +8,8 @@
 // Alpine.js.
 
 // ── Copy that still needs wording ───────────────────────────────────────
-const ADMIN_ERROR_COPY = "[[TIM: something went wrong message]]";
-const ADMIN_DELETED_COPY = "[[TIM: deleted confirmation]]";
+const ADMIN_ERROR_COPY = "That didn't save. Check your connection and try again.";
+const ADMIN_DELETED_COPY = "Deleted.";
 
 // Must match the options on seeker-form.html and the check constraint in
 // supabase/schema.sql.

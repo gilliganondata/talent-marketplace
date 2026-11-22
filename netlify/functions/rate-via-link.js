@@ -102,8 +102,8 @@ function htmlResponse(statusCode, message) {
     body: `
       <!DOCTYPE html>
       <html>
-        <head><meta charset="UTF-8" /><title>Rating</title></head>
-        <body style="font-family: system-ui, sans-serif; max-width: 420px; margin: 4rem auto; text-align: center; color: #1a1a1a;">
+        <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="color-scheme" content="light dark" /><title>Rating</title></head>
+        <body style="font-family: system-ui, sans-serif; max-width: 420px; margin: 4rem auto; text-align: center;">
           <p style="font-size: 1.1rem;">${escapeHtml(message)}</p>
         </body>
       </html>

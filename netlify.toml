@@ -1,3 +1,14 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+
+# Specific to the original instance (talent.atrwconsulting.com): Netlify doesn't
+# redirect domain aliases to the primary domain on its own, so this sends the
+# old hostname to the new one, keeping path and query string. It only matches
+# that exact hostname, so it's harmless in forks, but you should remove or
+# replace it (see README, Deploy).
+[[redirects]]
+  from = "https://talent.gilliganondata.com/*"
+  to = "https://talent.atrwconsulting.com/:splat"
+  status = 301
+  force = true
